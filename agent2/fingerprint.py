@@ -11,10 +11,15 @@ import git
 from fastapi import FastAPI
 from pydantic import BaseModel
 
+from dotenv import load_dotenv
+
 from .github_fetch import fetch_repos
 from .clone_repo import clone_repo
 from .style_features import extract_features
 from .similarity import compute_similarity
+from .llm_analysis import analyze_semantic_style
+
+load_dotenv() # Load keys from .env
 
 # ---------------------------------------------------------------------------
 # Logging setup
@@ -34,6 +39,7 @@ app = FastAPI(title="Astraea — Developer Code Fingerprinting")
 class VerifyRequest(BaseModel):
     username: str
     repo_url: str
+    groq_api_key: str = None
 
 
 # ---------------------------------------------------------------------------
@@ -76,8 +82,9 @@ def verify_developer(username: str, patch_repo_url: str) -> dict:
       4. Clone the patch repo.
       5. Extract its features.
       6. Compute similarity score.
-      7. Check commit author metadata.
-      8. Return a verification result dict.
+      7. Perform semantic LLM analysis (if key available).
+      8. Check commit author metadata.
+      9. Return a verification result dict.
     """
 
     tmp_dir = tempfile.mkdtemp(prefix="astraea_")
@@ -126,20 +133,32 @@ def verify_developer(username: str, patch_repo_url: str) -> dict:
     patch_features = extract_features(patch_path)
 
     # ------ Step 6: Compute similarity ------
-    logger.info("Step 6/6 — Computing similarity & checking commits")
+    logger.info("Step 6/7 — Computing similarity & checking commits")
     style_similarity = compute_similarity(dev_features, patch_features)
     commit_match = _check_commit_author(patch_path, username)
 
-    # Ownership score: blend of style similarity and commit signal
+    # ------ Step 7: LLM Semantic Analysis ------
+    logger.info("Step 7/7 — Semantic LLM analysis")
+    api_key = os.getenv("GROQ_API_KEY")
+    semantic_result = analyze_semantic_style(dev_paths, patch_path, api_key)
+    semantic_score = semantic_result.get("score", 0.0)
+
+    # Ownership score: blend of style similarity, commit signal, and LLM semantic analysis
+    # Weights: Style (0.4) + Commit (0.2) + LLM Semantic (0.4)
     ownership_score = round(
-        style_similarity * 0.7 + (0.3 if commit_match else 0.0), 2
+        style_similarity * 0.4 + 
+        (0.2 if commit_match else 0.0) +
+        semantic_score * 0.4, 2
     )
 
-    verified = ownership_score > 0.6 and commit_match
+    # Verified if ownership score is reasonable and we have some positive signal
+    verified = ownership_score > 0.6 and (commit_match or semantic_score > 0.7)
 
     result = {
         "ownership_score": ownership_score,
         "style_similarity": round(style_similarity, 2),
+        "semantic_similarity": round(semantic_score, 2),
+        "semantic_explanation": semantic_result.get("explanation"),
         "commit_match": commit_match,
         "verified": verified,
     }

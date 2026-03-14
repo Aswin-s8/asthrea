@@ -1,60 +1,5 @@
-# Astraea — Developer Code Fingerprinting System (Complete Source Code)
-
-> **What this project does:** Given a GitHub username and a repository URL, this system verifies whether the repository was likely written by that developer. It does this by analyzing coding style (comment ratio, line length, indentation, function length) across the developer's other public repos and comparing it to the submitted repo, plus checking commit author metadata.
-
-> **Tech stack:** Python, FastAPI, GitPython, Requests
-
-> **How to run:**
-> ```
-> cd astraea
-> pip install -r agent2/requirements.txt
-> uvicorn agent2.fingerprint:app --host 0.0.0.0 --port 8000
-> ```
-> Then send a POST request to `/verify-developer` with `{"username": "...", "repo_url": "..."}`.
-
----
-
-## Project Structure
-
-```
-astraea/
-└── agent2/
-    ├── __init__.py           # Makes agent2 a Python package
-    ├── requirements.txt      # Dependencies
-    ├── github_fetch.py       # Module 1: Fetch repos from GitHub API
-    ├── clone_repo.py         # Module 2: Clone repos locally
-    ├── style_features.py     # Module 3: Extract coding style features
-    ├── similarity.py         # Module 4: Compute similarity score
-    └── fingerprint.py        # Module 5: Orchestrator + FastAPI endpoint
-```
-
----
-
-## File 1: `requirements.txt`
-
-```
-fastapi
-uvicorn[standard]
-gitpython
-requests
-```
-
----
-
-## File 2: `__init__.py`
-
-```python
-# Empty file — its presence makes `agent2/` a Python package so we can do
-# relative imports like `from .github_fetch import fetch_repos`.
-```
-
----
-
-## File 3: `github_fetch.py` — Fetch Public Repos from GitHub API
-
-```python
-"""
-github_fetch.py — Fetch all public repositories of a GitHub user.
+﻿"""
+github_fetch.py â€” Fetch all public repositories of a GitHub user.
 """
 
 import logging
@@ -105,15 +50,8 @@ def fetch_repos(username: str) -> list[str]:
 
     logger.info("Found %d non-fork repositories for '%s'", len(clone_urls), username)
     return clone_urls
-```
-
----
-
-## File 4: `clone_repo.py` — Clone Repositories Locally
-
-```python
 """
-clone_repo.py — Clone repositories locally using GitPython.
+clone_repo.py â€” Clone repositories locally using GitPython.
 """
 
 import logging
@@ -134,7 +72,7 @@ def clone_repo(url: str, dest: str) -> str:
     Raises:
         RuntimeError: If the clone operation fails.
     """
-    logger.info("Cloning %s → %s", url, dest)
+    logger.info("Cloning %s â†’ %s", url, dest)
 
     try:
         if os.path.exists(dest):
@@ -146,19 +84,12 @@ def clone_repo(url: str, dest: str) -> str:
 
     except git.GitCommandError as exc:
         raise RuntimeError(f"Could not clone repository '{url}': {exc}") from exc
-```
-
----
-
-## File 5: `style_features.py` — Extract Coding Style Features
-
-```python
 """
-style_features.py — Extract coding-style features from a Python repository.
+style_features.py â€” Extract coding-style features from a Python repository.
 
 Performance safeguards:
-  • Only the first 50 .py files discovered are analysed.
-  • The following directories are skipped while walking the repo:
+  â€¢ Only the first 50 .py files discovered are analysed.
+  â€¢ The following directories are skipped while walking the repo:
     .git, node_modules, venv, dist, build, __pycache__
 """
 
@@ -192,11 +123,11 @@ def extract_features(repo_path: str) -> dict:
     """
     Walk all (up to 50) Python files in *repo_path* and compute:
 
-    - total_lines        – total number of lines across all files
-    - comment_ratio      – ratio of comment lines to total lines
-    - avg_line_length    – average number of characters per line
-    - indent_style       – "spaces" | "tabs" (majority wins)
-    - avg_function_length – average number of body lines inside ``def`` blocks
+    - total_lines        â€“ total number of lines across all files
+    - comment_ratio      â€“ ratio of comment lines to total lines
+    - avg_line_length    â€“ average number of characters per line
+    - indent_style       â€“ "spaces" | "tabs" (majority wins)
+    - avg_function_length â€“ average number of body lines inside ``def`` blocks
 
     Returns a feature dictionary.  If the repo contains no Python files,
     returns a dict with zeroed / default values.
@@ -263,7 +194,7 @@ def extract_features(repo_path: str) -> dict:
                 elif (len(line) - len(line.lstrip())) > func_indent:
                     current_func_lines += 1
                 else:
-                    # Dedented → function ended
+                    # Dedented â†’ function ended
                     function_lengths.append(current_func_lines)
                     in_function = False
                     current_func_lines = 0
@@ -278,32 +209,25 @@ def extract_features(repo_path: str) -> dict:
         "total_lines": total_lines,
         "comment_ratio": round(comment_lines / total_lines, 4) if total_lines else 0.0,
         "avg_line_length": round(total_line_length / total_lines, 2) if total_lines else 0.0,
+        "indent_style": "tabs" if tabs_count > spaces_count else "spaces",
         "avg_function_length": (
             round(sum(function_lengths) / len(function_lengths), 2)
             if function_lengths
             else 0.0
         ),
-        "indent_style": "tabs" if tabs_count > spaces_count else "spaces",
     }
 
     logger.info("Features extracted: %s", features)
     return features
-```
-
----
-
-## File 6: `similarity.py` — Compute Weighted Similarity Score
-
-```python
 """
-similarity.py — Compute a weighted similarity score between developer
+similarity.py â€” Compute a weighted similarity score between developer
 repositories and a submitted patch repository.
 
 Weights:
-  comment_ratio       → 0.2
-  avg_line_length     → 0.2
-  indent_style        → 0.2
-  avg_function_length → 0.4
+  comment_ratio       â†’ 0.2
+  avg_line_length     â†’ 0.2
+  indent_style        â†’ 0.2
+  avg_function_length â†’ 0.4
 
 The returned score is normalised to [0, 1].
 """
@@ -346,7 +270,7 @@ def compute_similarity(dev_features_list: list[dict], patch_features: dict) -> f
     Returns a float in [0, 1].
     """
     if not dev_features_list:
-        logger.warning("No developer features provided — returning 0.0")
+        logger.warning("No developer features provided â€” returning 0.0")
         return 0.0
 
     # Average the developer features
@@ -371,15 +295,96 @@ def compute_similarity(dev_features_list: list[dict], patch_features: dict) -> f
     score = round(min(max(score, 0.0), 1.0), 4)
     logger.info("Computed similarity score: %s", score)
     return score
-```
-
----
-
-## File 7: `fingerprint.py` — Orchestrator + FastAPI Endpoint (Main Entry Point)
-
-```python
 """
-fingerprint.py — Orchestrator and FastAPI endpoint for the Astraea
+llm_analysis.py â€” Semantic code analysis using Groq/LLaMA.
+"""
+
+import os
+import logging
+from groq import Groq
+
+logger = logging.getLogger(__name__)
+
+def analyze_semantic_style(dev_paths, patch_path, api_key):
+    """
+    Sends code snippets from developer repos and the patch repo to Groq
+    for semantic similarity analysis.
+    """
+    if not api_key:
+        logger.warning("No Groq API key provided for semantic analysis.")
+        return {"score": 0.0, "explanation": "No LLM key provided."}
+
+    client = Groq(api_key=api_key)
+    
+    # helper to get representative snippets
+    def get_snippets(repo_path, max_chars=2000):
+        snippets = []
+        chars_read = 0
+        for root, dirs, files in os.walk(repo_path):
+            # reuse SKIP_DIRS from style_features logic if possible, but keep simple here
+            for f in files:
+                if f.endswith('.py') and chars_read < max_chars:
+                    fpath = os.path.join(root, f)
+                    try:
+                        with open(fpath, 'r', encoding='utf-8', errors='ignore') as fh:
+                            content = fh.read(500) # grab a chunk
+                            snippets.append(f"--- File: {f} ---\n{content}")
+                            chars_read += len(content)
+                    except:
+                        continue
+        return "\n\n".join(snippets)
+
+    dev_context = ""
+    for i, p in enumerate(dev_paths[:2]): # sample first 2 repos
+        dev_context += f"\nDEVELOPER REPOSITORY {i+1} SNIPPETS:\n{get_snippets(p, 1000)}\n"
+    
+    patch_context = f"\nSUBMITTED REPOSITORY SNIPPETS:\n{get_snippets(patch_path, 2000)}\n"
+
+    prompt = f"""
+Analyze the coding style of the developer based on these snippets and compare it to the submitted repository.
+Ignore common libraries. Focus on:
+1. Variable naming patterns (snake_case vs camelCase, descriptive vs short).
+2. Logic structure (deep nesting, preference for comprehensions, etc).
+3. Commenting style and tone.
+
+{dev_context}
+---------------------------------------------------------
+{patch_context}
+
+Provide a JSON response with:
+- "confidence_score": (float between 0 and 1)
+- "reasoning": (brief string explaining the verdict)
+"""
+
+    try:
+        logger.info("Requesting LLM semantic analysis from Groq...")
+        chat_completion = client.chat.completions.create(
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are an expert code forensic analyst. Return ONLY a JSON object.",
+                },
+                {
+                    "role": "user",
+                    "content": prompt,
+                }
+            ],
+            model="llama-3.3-70b-versatile",
+            response_format={"type": "json_object"},
+        )
+        
+        import json
+        result = json.loads(chat_completion.choices[0].message.content)
+        logger.info("LLM Analysis complete: %s", result)
+        return {
+            "score": result.get("confidence_score", 0.0),
+            "explanation": result.get("reasoning", "No explanation provided.")
+        }
+    except Exception as e:
+        logger.error("LLM Analysis failed: %s", e)
+        return {"score": 0.0, "explanation": f"LLM error: {str(e)}"}
+"""
+fingerprint.py â€” Orchestrator and FastAPI endpoint for the Astraea
 Developer Code Fingerprinting system.
 """
 
@@ -391,10 +396,15 @@ import git
 from fastapi import FastAPI
 from pydantic import BaseModel
 
+from dotenv import load_dotenv
+
 from .github_fetch import fetch_repos
 from .clone_repo import clone_repo
 from .style_features import extract_features
 from .similarity import compute_similarity
+from .llm_analysis import analyze_semantic_style
+
+load_dotenv() # Load keys from .env
 
 # ---------------------------------------------------------------------------
 # Logging setup
@@ -408,12 +418,13 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # FastAPI app
 # ---------------------------------------------------------------------------
-app = FastAPI(title="Astraea — Developer Code Fingerprinting")
+app = FastAPI(title="Astraea â€” Developer Code Fingerprinting")
 
 
 class VerifyRequest(BaseModel):
     username: str
     repo_url: str
+    groq_api_key: str = None
 
 
 # ---------------------------------------------------------------------------
@@ -456,15 +467,16 @@ def verify_developer(username: str, patch_repo_url: str) -> dict:
       4. Clone the patch repo.
       5. Extract its features.
       6. Compute similarity score.
-      7. Check commit author metadata.
-      8. Return a verification result dict.
+      7. Perform semantic LLM analysis (if key available).
+      8. Check commit author metadata.
+      9. Return a verification result dict.
     """
 
     tmp_dir = tempfile.mkdtemp(prefix="astraea_")
 
     # ------ Step 1: Fetch repos ------
     try:
-        logger.info("Step 1/6 — Fetching repositories for '%s'", username)
+        logger.info("Step 1/6 â€” Fetching repositories for '%s'", username)
         repo_urls = fetch_repos(username)
     except RuntimeError as exc:
         logger.error("Failed to fetch repos: %s", exc)
@@ -475,7 +487,7 @@ def verify_developer(username: str, patch_repo_url: str) -> dict:
         return {"error": f"No public repositories found for user '{username}'"}
 
     # ------ Step 2: Clone first 3 repos ------
-    logger.info("Step 2/6 — Cloning up to 3 developer repos")
+    logger.info("Step 2/6 â€” Cloning up to 3 developer repos")
     dev_paths: list[str] = []
     for i, url in enumerate(repo_urls[:3]):
         dest = os.path.join(tmp_dir, f"dev_repo_{i}")
@@ -489,11 +501,11 @@ def verify_developer(username: str, patch_repo_url: str) -> dict:
         return {"error": "Could not clone any developer repositories"}
 
     # ------ Step 3: Extract features ------
-    logger.info("Step 3/6 — Extracting features from developer repos")
+    logger.info("Step 3/6 â€” Extracting features from developer repos")
     dev_features = [extract_features(p) for p in dev_paths]
 
     # ------ Step 4: Clone patch repo ------
-    logger.info("Step 4/6 — Cloning patch repo")
+    logger.info("Step 4/6 â€” Cloning patch repo")
     patch_dest = os.path.join(tmp_dir, "patch_repo")
     try:
         patch_path = clone_repo(patch_repo_url, patch_dest)
@@ -502,24 +514,36 @@ def verify_developer(username: str, patch_repo_url: str) -> dict:
         return {"error": f"Could not clone repository: {exc}"}
 
     # ------ Step 5: Extract patch features ------
-    logger.info("Step 5/6 — Extracting features from patch repo")
+    logger.info("Step 5/6 â€” Extracting features from patch repo")
     patch_features = extract_features(patch_path)
 
     # ------ Step 6: Compute similarity ------
-    logger.info("Step 6/6 — Computing similarity & checking commits")
+    logger.info("Step 6/7 â€” Computing similarity & checking commits")
     style_similarity = compute_similarity(dev_features, patch_features)
     commit_match = _check_commit_author(patch_path, username)
 
-    # Ownership score: blend of style similarity and commit signal
+    # ------ Step 7: LLM Semantic Analysis ------
+    logger.info("Step 7/7 â€” Semantic LLM analysis")
+    api_key = os.getenv("GROQ_API_KEY")
+    semantic_result = analyze_semantic_style(dev_paths, patch_path, api_key)
+    semantic_score = semantic_result.get("score", 0.0)
+
+    # Ownership score: blend of style similarity, commit signal, and LLM semantic analysis
+    # Weights: Style (0.4) + Commit (0.2) + LLM Semantic (0.4)
     ownership_score = round(
-        style_similarity * 0.7 + (0.3 if commit_match else 0.0), 2
+        style_similarity * 0.4 + 
+        (0.2 if commit_match else 0.0) +
+        semantic_score * 0.4, 2
     )
 
-    verified = ownership_score > 0.6 and commit_match
+    # Verified if ownership score is reasonable and we have some positive signal
+    verified = ownership_score > 0.6 and (commit_match or semantic_score > 0.7)
 
     result = {
         "ownership_score": ownership_score,
         "style_similarity": round(style_similarity, 2),
+        "semantic_similarity": round(semantic_score, 2),
+        "semantic_explanation": semantic_result.get("explanation"),
         "commit_match": commit_match,
         "verified": verified,
     }
@@ -534,51 +558,11 @@ def verify_developer(username: str, patch_repo_url: str) -> dict:
 
 @app.post("/verify-developer")
 async def verify_developer_endpoint(req: VerifyRequest):
-    """POST /verify-developer — run the full fingerprint verification."""
+    """POST /verify-developer â€” run the full fingerprint verification."""
     return verify_developer(req.username, req.repo_url)
-```
-
----
-
-## How the System Works (Data Flow)
-
-```
-POST /verify-developer { username, repo_url }
-        │
-        ▼
-  ┌─────────────────┐
-  │  github_fetch.py │  ──►  GitHub API: get user's public repos
-  └────────┬────────┘
-           ▼
-  ┌─────────────────┐
-  │  clone_repo.py   │  ──►  Shallow-clone 3 dev repos + the submitted repo
-  └────────┬────────┘
-           ▼
-  ┌──────────────────┐
-  │ style_features.py │  ──►  Extract: comment_ratio, avg_line_length,
-  └────────┬─────────┘       indent_style, avg_function_length
-           ▼
-  ┌─────────────────┐
-  │  similarity.py   │  ──►  Weighted comparison (0.2/0.2/0.2/0.4)
-  └────────┬────────┘
-           ▼
-  ┌─────────────────┐
-  │ fingerprint.py   │  ──►  Blend similarity + commit check → verified T/F
-  └─────────────────┘
-```
-
-## Example Output
-
-```json
-{
-    "ownership_score": 0.96,
-    "style_similarity": 0.94,
-    "commit_match": true,
-    "verified": true
-}
-```
-
-- **ownership_score**: Final blended score (style_similarity × 0.7 + 0.3 if commits match)
-- **style_similarity**: How similar the coding style is (0 to 1)
-- **commit_match**: Whether the username appears in commit author metadata
-- **verified**: `true` only if ownership_score > 0.6 AND commit_match is true
+fastapi
+uvicorn[standard]
+gitpython
+requests
+groq
+python-dotenv

@@ -2,3 +2,5 @@ fastapi
 uvicorn[standard]
 gitpython
 requests
+groq
+python-dotenv
